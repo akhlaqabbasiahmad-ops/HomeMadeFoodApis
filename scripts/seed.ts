@@ -143,10 +143,17 @@ async function runSeeder() {
       console.error('   Invalid username or password.');
       console.error('   Check your DATABASE_USERNAME and DATABASE_PASSWORD environment variables.');
     } else if (error.code === '3D000' || error.message?.includes('database')) {
+      const dbName = process.env.DATABASE_NAME || 'homemadefood_db';
       console.error('\n🔍 Database Not Found:');
-      console.error(`   The database "${process.env.DATABASE_NAME || 'homemadefood_db'}" does not exist.`);
-      console.error('   Create the database first:');
-      console.error('   psql -U postgres -c "CREATE DATABASE homemadefood_db;"');
+      console.error(`   The database "${dbName}" does not exist.`);
+      console.error('   Create the database first using one of these methods:');
+      console.error(`\n   1. Using psql command:`);
+      console.error(`      psql -U ${process.env.DATABASE_USERNAME || 'postgres'} -c "CREATE DATABASE ${dbName};"`);
+      console.error(`\n   2. Using psql interactive session:`);
+      console.error(`      psql -U ${process.env.DATABASE_USERNAME || 'postgres'}`);
+      console.error(`      Then run: CREATE DATABASE ${dbName};`);
+      console.error(`\n   3. With password prompt:`);
+      console.error(`      PGPASSWORD='${process.env.DATABASE_PASSWORD ? '***' : 'your-password'}' psql -U ${process.env.DATABASE_USERNAME || 'postgres'} -h ${process.env.DATABASE_HOST || 'localhost'} -c "CREATE DATABASE ${dbName};"`);
     } else {
       console.error('   Error details:', error.message);
       if (error.code) {
