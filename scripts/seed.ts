@@ -111,8 +111,20 @@ async function runSeeder() {
   
   try {
     console.log('🔌 Attempting to connect to database...');
+    console.log(`   Connection details:`);
+    console.log(`   - Type: ${databaseConfig.type}`);
+    console.log(`   - Host: ${(databaseConfig as any).host}`);
+    console.log(`   - Port: ${(databaseConfig as any).port}`);
+    console.log(`   - Database: ${(databaseConfig as any).database}`);
+    console.log(`   - Username: ${(databaseConfig as any).username}`);
+    console.log(`   - Password: ${(databaseConfig as any).password ? '***' : '(empty)'}`);
+    
     await dataSource.initialize();
     console.log('✅ Database connection established');
+    
+    // Verify database connection
+    const result = await dataSource.query('SELECT current_database(), current_user');
+    console.log(`   Connected to database: ${result[0].current_database} as user: ${result[0].current_user}`);
     
     // Run the database seeder
     const seeder = new DatabaseSeeder(dataSource);
@@ -121,6 +133,9 @@ async function runSeeder() {
     console.log('🎉 Database seeding completed successfully!');
   } catch (error: any) {
     console.error('\n❌ Error during seeding:');
+    console.error(`   Error Code: ${error.code || 'N/A'}`);
+    console.error(`   Error Message: ${error.message || 'Unknown error'}`);
+    console.error(`   Error Stack: ${error.stack ? error.stack.split('\n').slice(0, 3).join('\n') : 'N/A'}`);
     
     if (error.code === 'ECONNREFUSED') {
       console.error('\n🔍 Connection Refused - Troubleshooting steps:');
@@ -142,18 +157,31 @@ async function runSeeder() {
       console.error('\n🔍 Authentication Failed:');
       console.error('   Invalid username or password.');
       console.error('   Check your DATABASE_USERNAME and DATABASE_PASSWORD environment variables.');
-    } else if (error.code === '3D000' || error.message?.includes('database')) {
+    } else if (error.code === '3D000' || error.message?.includes('database') || error.message?.toLowerCase().includes('does not exist')) {
       const dbName = process.env.DATABASE_NAME || 'homemadefood_db';
-      console.error('\n🔍 Database Not Found:');
-      console.error(`   The database "${dbName}" does not exist.`);
-      console.error('   Create the database first using one of these methods:');
-      console.error(`\n   1. Using psql command:`);
-      console.error(`      psql -U ${process.env.DATABASE_USERNAME || 'postgres'} -c "CREATE DATABASE ${dbName};"`);
-      console.error(`\n   2. Using psql interactive session:`);
-      console.error(`      psql -U ${process.env.DATABASE_USERNAME || 'postgres'}`);
-      console.error(`      Then run: CREATE DATABASE ${dbName};`);
-      console.error(`\n   3. With password prompt:`);
-      console.error(`      PGPASSWORD='${process.env.DATABASE_PASSWORD ? '***' : 'your-password'}' psql -U ${process.env.DATABASE_USERNAME || 'postgres'} -h ${process.env.DATABASE_HOST || 'localhost'} -c "CREATE DATABASE ${dbName};"`);
+      console.error('\n🔍 Database Connection Issue:');
+      console.error(`   Database name: "${dbName}"`);
+      console.error(`   Error code: ${error.code || 'N/A'}`);
+      
+      // Check if it's actually a permission issue
+      if (error.message?.includes('permission denied') || error.code === '42501') {
+        console.error('\n   This appears to be a permission issue.');
+        console.error('   The database exists, but the user might not have permission to access it.');
+        console.error(`\n   Solutions:`);
+        console.error(`   1. Grant permissions:`);
+        console.error(`      psql -U postgres -h ${process.env.DATABASE_HOST || 'localhost'} -c "GRANT ALL PRIVILEGES ON DATABASE ${dbName} TO ${process.env.DATABASE_USERNAME || 'postgres'};"`);
+        console.error(`   2. Check if you're using the correct username/password`);
+      } else {
+        console.error('\n   Possible causes:');
+        console.error('   1. Database name mismatch (check case sensitivity)');
+        console.error('   2. Database doesn\'t exist (verify with: psql -U postgres -l)');
+        console.error('   3. Connection string issue');
+        console.error('   4. Wrong host or port');
+        console.error('\n   Verify the database exists:');
+        console.error(`      psql -U ${process.env.DATABASE_USERNAME || 'postgres'} -h ${process.env.DATABASE_HOST || 'localhost'} -l | grep ${dbName}`);
+        console.error('\n   Create the database if it doesn\'t exist:');
+        console.error(`      PGPASSWORD='your-password' psql -U ${process.env.DATABASE_USERNAME || 'postgres'} -h ${process.env.DATABASE_HOST || 'localhost'} -c "CREATE DATABASE ${dbName};"`);
+      }
     } else {
       console.error('   Error details:', error.message);
       if (error.code) {
