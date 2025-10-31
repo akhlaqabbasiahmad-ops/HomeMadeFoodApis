@@ -14,6 +14,7 @@
     "start:prod": "node dist/main",
     "lint": "eslint \"src/**/*.ts\" --fix",
     "seed": "ts-node scripts/seed.ts",
+    "seed:prod": "NODE_ENV=production ts-node scripts/seed.ts",
     "db:init": "mkdir -p data && echo 'SQLite database will be created automatically'",
     "db:reset": "rm -f data/homemadefood.sqlite && echo 'SQLite database reset'"
   },
