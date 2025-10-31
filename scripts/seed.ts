@@ -36,87 +36,67 @@ if (!envLoaded) {
   }
 }
 
-// Load environment variables
-const nodeEnv = process.env.NODE_ENV || 'development';
-
-// Create database configuration based on environment
+// Create PostgreSQL database configuration
 const getDatabaseConfig = (): DataSourceOptions => {
-  if (nodeEnv === 'production') {
-    // Production PostgreSQL configuration
-    return {
-      type: 'postgres',
-      host: process.env.DATABASE_HOST || 'localhost',
-      port: parseInt(process.env.DATABASE_PORT || '5432', 10),
-      username: process.env.DATABASE_USERNAME || 'postgres',
-      password: process.env.DATABASE_PASSWORD || '',
-      database: process.env.DATABASE_NAME || 'homemadefood_db',
-      entities: [UserEntity, AddressEntity, RestaurantEntity, FoodItemEntity, Category, Order, OrderItem],
-      synchronize: process.env.DATABASE_SYNCHRONIZE === 'true', // Allow override for initial setup
-      migrations: [path.join(__dirname, '../src/infrastructure/database/migrations/*.ts')],
-      migrationsRun: false, // We'll run manually if needed
-      logging: process.env.DATABASE_LOGGING === 'true',
-      ssl: process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : false,
-    };
-  }
-
-  // Development SQLite configuration
   return {
-    type: 'sqlite' as const,
-    database: path.join(__dirname, '../data/homemadefood.sqlite'),
+    type: 'postgres',
+    host: process.env.DATABASE_HOST || 'localhost',
+    port: parseInt(process.env.DATABASE_PORT || '5432', 10),
+    username: process.env.DATABASE_USERNAME || 'postgres',
+    password: process.env.DATABASE_PASSWORD || '',
+    database: process.env.DATABASE_NAME || 'homemadefood_db',
     entities: [UserEntity, AddressEntity, RestaurantEntity, FoodItemEntity, Category, Order, OrderItem],
-    synchronize: true,
-    logging: true,
+    synchronize: process.env.DATABASE_SYNCHRONIZE === 'true', // Allow override for initial setup
+    migrations: [path.join(__dirname, '../src/infrastructure/database/migrations/*.ts')],
+    migrationsRun: false, // We'll run manually if needed
+    logging: process.env.DATABASE_LOGGING === 'true',
+    ssl: process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : false,
   };
 };
 
 const databaseConfig = getDatabaseConfig();
 
 async function runSeeder() {
-  console.log(`🚀 Starting database seeding process for ${nodeEnv} environment...`);
+  console.log('🚀 Starting database seeding process...');
+  console.log('📊 Using PostgreSQL database');
+  console.log(`   Host: ${process.env.DATABASE_HOST || 'localhost'}`);
+  console.log(`   Port: ${process.env.DATABASE_PORT || '5432'}`);
+  console.log(`   Database: ${process.env.DATABASE_NAME || 'homemadefood_db'}`);
+  console.log(`   Username: ${process.env.DATABASE_USERNAME || 'postgres'}`);
   
-  if (nodeEnv === 'production') {
-    console.log('📊 Using PostgreSQL database');
-    console.log(`   Host: ${process.env.DATABASE_HOST || 'localhost'}`);
-    console.log(`   Port: ${process.env.DATABASE_PORT || '5432'}`);
-    console.log(`   Database: ${process.env.DATABASE_NAME || 'homemadefood_db'}`);
-    console.log(`   Username: ${process.env.DATABASE_USERNAME || 'postgres'}`);
-    
-    // Warn about synchronize in production
-    if (process.env.DATABASE_SYNCHRONIZE === 'true') {
-      console.warn('\n⚠️  WARNING: DATABASE_SYNCHRONIZE=true is enabled!');
-      console.warn('   This will auto-create/update database tables.');
-      console.warn('   ⚠️  REMOVE DATABASE_SYNCHRONIZE=true from .env after setup!');
-      console.warn('   Synchronize should NEVER be enabled in production long-term.\n');
-    } else {
-      console.log('   Schema sync: disabled (using migrations)');
-    }
-    
-    // Validate required environment variables
-    if (!process.env.DATABASE_PASSWORD) {
-      console.error('❌ Error: DATABASE_PASSWORD environment variable is required for production');
-      if (!envLoaded) {
-        console.error('   ⚠️  No .env file was found or loaded.');
-        console.error('   Please ensure you have a .env file in the project root with DATABASE_PASSWORD set.');
-      } else {
-        console.error('   ⚠️  .env file was loaded, but DATABASE_PASSWORD is missing or empty.');
-        console.error('   Please add DATABASE_PASSWORD=your-password to your .env file.');
-      }
-      console.error('\n   Current values:');
-      console.error(`   - DATABASE_HOST: ${process.env.DATABASE_HOST || '(default: localhost)'}`);
-      console.error(`   - DATABASE_PORT: ${process.env.DATABASE_PORT || '(default: 5432)'}`);
-      console.error(`   - DATABASE_USERNAME: ${process.env.DATABASE_USERNAME || '(default: postgres)'}`);
-      console.error(`   - DATABASE_PASSWORD: ${process.env.DATABASE_PASSWORD ? '***' : '(MISSING)'}`);
-      console.error(`   - DATABASE_NAME: ${process.env.DATABASE_NAME || '(default: homemadefood_db)'}`);
-      process.exit(1);
-    }
-    
-    if (!process.env.DATABASE_HOST || process.env.DATABASE_HOST === 'localhost') {
-      console.warn('⚠️  Warning: Using localhost. Make sure PostgreSQL is running.');
-      console.warn('   If using Docker: docker-compose up -d postgres');
-      console.warn('   If using local PostgreSQL: Make sure the service is started');
-    }
+  // Warn about synchronize
+  if (process.env.DATABASE_SYNCHRONIZE === 'true') {
+    console.warn('\n⚠️  WARNING: DATABASE_SYNCHRONIZE=true is enabled!');
+    console.warn('   This will auto-create/update database tables.');
+    console.warn('   ⚠️  REMOVE DATABASE_SYNCHRONIZE=true from .env after setup!');
+    console.warn('   Synchronize should NEVER be enabled in production long-term.\n');
   } else {
-    console.log('📊 Using SQLite database');
+    console.log('   Schema sync: disabled (using migrations)');
+  }
+  
+  // Validate required environment variables
+  if (!process.env.DATABASE_PASSWORD) {
+    console.error('❌ Error: DATABASE_PASSWORD environment variable is required');
+    if (!envLoaded) {
+      console.error('   ⚠️  No .env file was found or loaded.');
+      console.error('   Please ensure you have a .env file in the project root with DATABASE_PASSWORD set.');
+    } else {
+      console.error('   ⚠️  .env file was loaded, but DATABASE_PASSWORD is missing or empty.');
+      console.error('   Please add DATABASE_PASSWORD=your-password to your .env file.');
+    }
+    console.error('\n   Current values:');
+    console.error(`   - DATABASE_HOST: ${process.env.DATABASE_HOST || '(default: localhost)'}`);
+    console.error(`   - DATABASE_PORT: ${process.env.DATABASE_PORT || '(default: 5432)'}`);
+    console.error(`   - DATABASE_USERNAME: ${process.env.DATABASE_USERNAME || '(default: postgres)'}`);
+    console.error(`   - DATABASE_PASSWORD: ${process.env.DATABASE_PASSWORD ? '***' : '(MISSING)'}`);
+    console.error(`   - DATABASE_NAME: ${process.env.DATABASE_NAME || '(default: homemadefood_db)'}`);
+    process.exit(1);
+  }
+  
+  if (!process.env.DATABASE_HOST || process.env.DATABASE_HOST === 'localhost') {
+    console.warn('⚠️  Warning: Using localhost. Make sure PostgreSQL is running.');
+    console.warn('   If using Docker: docker-compose up -d postgres');
+    console.warn('   If using local PostgreSQL: Make sure the service is started');
   }
   
   const dataSource = new DataSource(databaseConfig);

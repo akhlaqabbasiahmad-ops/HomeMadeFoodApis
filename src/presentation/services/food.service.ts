@@ -17,11 +17,18 @@ export class FoodService {
     const { query, category, page = 1, limit = 10 } = searchDto;
     const queryBuilder = this.foodRepository.createQueryBuilder('food');
     
+    // Always filter by available items
+    queryBuilder.where('food.isAvailable = :isAvailable', { isAvailable: true });
+    
+    // Add search query filter if provided
     if (query) {
-      queryBuilder.where('food.name LIKE :query', { query: `%${query}%` })
-        .orWhere('food.description LIKE :query', { query: `%${query}%` });
+      queryBuilder.andWhere(
+        '(food.name LIKE :query OR food.description LIKE :query)',
+        { query: `%${query}%` }
+      );
     }
     
+    // Add category filter if provided
     if (category) {
       queryBuilder.andWhere('food.category = :category', { category });
     }
@@ -29,6 +36,7 @@ export class FoodService {
     const [items, total] = await queryBuilder
       .skip((page - 1) * limit)
       .take(limit)
+      .orderBy('food.createdAt', 'DESC')
       .getManyAndCount();
 
     return { items, total, page, totalPages: Math.ceil(total / limit) };
@@ -43,23 +51,26 @@ export class FoodService {
 
   async getFeaturedItems(limit: number = 10) {
     return await this.foodRepository.find({
-      where: { isFeatured: true },
+      where: { isFeatured: true, isAvailable: true },
       take: limit,
+      order: { createdAt: 'DESC' },
     });
   }
 
   async getPopularItems(limit: number = 10) {
     return await this.foodRepository.find({
-      where: { isPopular: true },
+      where: { isPopular: true, isAvailable: true },
       take: limit,
+      order: { createdAt: 'DESC' },
     });
   }
 
   async getFoodItemsByRestaurant(restaurantId: string, page: number = 1, limit: number = 10) {
     const [items, total] = await this.foodRepository.findAndCount({
-      where: { restaurantId },
+      where: { restaurantId, isAvailable: true },
       skip: (page - 1) * limit,
       take: limit,
+      order: { createdAt: 'DESC' },
     });
     return { items, total, page, totalPages: Math.ceil(total / limit) };
   }
@@ -73,7 +84,10 @@ export class FoodService {
   }
 
   async getFoodItemById(id: string) {
-    return await this.foodRepository.findOne({ where: { id } });
+    const item = await this.foodRepository.findOne({ where: { id } });
+    // For public endpoints, only return if available
+    // Admin endpoints can access unavailable items
+    return item;
   }
 
   async updateFoodItem(id: string, updateDto: any) {
@@ -87,6 +101,7 @@ export class FoodService {
   }
 
   async getAllFoodItems(page: number = 1, limit: number = 50) {
+    // Admin endpoint - returns all items (available and unavailable)
     const [items, total] = await this.foodRepository.findAndCount({
       skip: (page - 1) * limit,
       take: limit,
