@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsNotEmpty, IsOptional, IsPhoneNumber, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsNumber, IsOptional, IsPhoneNumber, IsString, MinLength } from 'class-validator';
 
 export class CreateUserDto {
   @ApiProperty({ example: 'John Doe', description: 'User full name' })
@@ -68,10 +68,12 @@ export class CreateAddressDto {
 
   @ApiProperty({ example: 40.7128, description: 'Latitude coordinate' })
   @IsNotEmpty()
+  @IsNumber()
   latitude: number;
 
   @ApiProperty({ example: -74.0060, description: 'Longitude coordinate' })
   @IsNotEmpty()
+  @IsNumber()
   longitude: number;
 
   @ApiProperty({ example: true, description: 'Set as default address', required: false })

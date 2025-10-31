@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { AddressEntity } from '../../infrastructure/database/entities/address.entity';
 import { UserEntity } from '../../infrastructure/database/entities/user.entity';
 import { UserController } from '../controllers/user.controller';
+import { AddressService } from '../services/address.service';
 
 @Injectable()
 export class UserService {
@@ -43,7 +44,7 @@ export class UserService {
 @Module({
   imports: [TypeOrmModule.forFeature([UserEntity, AddressEntity])],
   controllers: [UserController],
-  providers: [UserService],
-  exports: [UserService],
+  providers: [UserService, AddressService],
+  exports: [UserService, AddressService],
 })
 export class UserModule {}

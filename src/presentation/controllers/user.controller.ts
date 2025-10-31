@@ -2,6 +2,7 @@ import {
     Body,
     Controller,
     Delete,
+    ForbiddenException,
     Get,
     Param,
     Patch,
@@ -17,14 +18,18 @@ import {
     ApiResponse,
     ApiTags,
 } from '@nestjs/swagger';
-import { CreateUserDto, UpdateUserDto } from '../../application/dto/user.dto';
+import { CreateAddressDto, CreateUserDto, UpdateUserDto } from '../../application/dto/user.dto';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { UserService } from '../modules/user.module';
+import { AddressService } from '../services/address.service';
 
 @ApiTags('users')
 @Controller('users')
 export class UserController {
-  constructor(private readonly userService: UserService) {}
+  constructor(
+    private readonly userService: UserService,
+    private readonly addressService: AddressService,
+  ) {}
 
   @Post()
   @ApiOperation({ summary: 'Create a new user' })
@@ -119,6 +124,53 @@ export class UserController {
     return {
       success: true,
       message: 'User deleted successfully',
+    };
+  }
+
+  @Get(':id/addresses')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get all addresses for a user' })
+  @ApiResponse({ status: 200, description: 'Addresses retrieved successfully' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Cannot access other users addresses' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  async getUserAddresses(@Param('id') userId: string, @Request() req) {
+    // Security check: Users can only access their own addresses (unless admin)
+    if (req.user.id !== userId && req.user.role !== 'admin') {
+      throw new ForbiddenException('You can only access your own addresses');
+    }
+
+    const addresses = await this.addressService.getUserAddresses(userId);
+    return {
+      success: true,
+      data: addresses,
+      message: 'Addresses retrieved successfully',
+    };
+  }
+
+  @Post(':id/addresses')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Create a new address for a user' })
+  @ApiResponse({ status: 201, description: 'Address created successfully' })
+  @ApiResponse({ status: 400, description: 'Bad request' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Cannot create addresses for other users' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  async createUserAddress(
+    @Param('id') userId: string,
+    @Body() createAddressDto: CreateAddressDto,
+    @Request() req,
+  ) {
+    // Security check: Users can only create addresses for themselves (unless admin)
+    if (req.user.id !== userId && req.user.role !== 'admin') {
+      throw new ForbiddenException('You can only create addresses for yourself');
+    }
+
+    const address = await this.addressService.createUserAddress(userId, createAddressDto);
+    return {
+      success: true,
+      data: address,
+      message: 'Address created successfully',
     };
   }
 }
