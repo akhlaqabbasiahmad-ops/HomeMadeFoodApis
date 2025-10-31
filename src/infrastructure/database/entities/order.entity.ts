@@ -57,10 +57,11 @@ export class Order {
   @Column()
   paymentMethod: string;
 
-  @Column({ type: 'datetime', default: () => 'CURRENT_TIMESTAMP' })
+  // Using Date type without explicit database type - TypeORM will use correct type per database
+  @Column({ default: () => 'CURRENT_TIMESTAMP' })
   orderDate: Date;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ nullable: true })
   estimatedDeliveryTime: Date;
 
   @Column({ nullable: true })
@@ -69,7 +70,7 @@ export class Order {
   @Column('text', { nullable: true })
   specialInstructions: string;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ nullable: true })
   actualDeliveryTime: Date;
 
   @CreateDateColumn()
