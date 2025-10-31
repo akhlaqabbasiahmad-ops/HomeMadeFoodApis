@@ -51,7 +51,9 @@ const getDatabaseConfig = (): DataSourceOptions => {
       password: process.env.DATABASE_PASSWORD || '',
       database: process.env.DATABASE_NAME || 'homemadefood_db',
       entities: [UserEntity, AddressEntity, RestaurantEntity, FoodItemEntity, Category, Order, OrderItem],
-      synchronize: false,
+      synchronize: process.env.DATABASE_SYNCHRONIZE === 'true', // Allow override for initial setup
+      migrations: [path.join(__dirname, '../src/infrastructure/database/migrations/*.ts')],
+      migrationsRun: false, // We'll run manually if needed
       logging: process.env.DATABASE_LOGGING === 'true',
       ssl: process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : false,
     };
@@ -78,6 +80,16 @@ async function runSeeder() {
     console.log(`   Port: ${process.env.DATABASE_PORT || '5432'}`);
     console.log(`   Database: ${process.env.DATABASE_NAME || 'homemadefood_db'}`);
     console.log(`   Username: ${process.env.DATABASE_USERNAME || 'postgres'}`);
+    
+    // Warn about synchronize in production
+    if (process.env.DATABASE_SYNCHRONIZE === 'true') {
+      console.warn('\n⚠️  WARNING: DATABASE_SYNCHRONIZE=true is enabled!');
+      console.warn('   This will auto-create/update database tables.');
+      console.warn('   ⚠️  REMOVE DATABASE_SYNCHRONIZE=true from .env after setup!');
+      console.warn('   Synchronize should NEVER be enabled in production long-term.\n');
+    } else {
+      console.log('   Schema sync: disabled (using migrations)');
+    }
     
     // Validate required environment variables
     if (!process.env.DATABASE_PASSWORD) {
@@ -126,6 +138,11 @@ async function runSeeder() {
     const result = await dataSource.query('SELECT current_database(), current_user');
     console.log(`   Connected to database: ${result[0].current_database} as user: ${result[0].current_user}`);
     
+    // If synchronize is enabled, warn about schema creation
+    if (process.env.DATABASE_SYNCHRONIZE === 'true') {
+      console.log('🔄 Synchronize is enabled - tables will be created automatically if they don\'t exist...');
+    }
+    
     // Run the database seeder
     const seeder = new DatabaseSeeder(dataSource);
     await seeder.run();
@@ -157,7 +174,26 @@ async function runSeeder() {
       console.error('\n🔍 Authentication Failed:');
       console.error('   Invalid username or password.');
       console.error('   Check your DATABASE_USERNAME and DATABASE_PASSWORD environment variables.');
-    } else if (error.code === '3D000' || error.message?.includes('database') || error.message?.toLowerCase().includes('does not exist')) {
+    } else if (error.code === '42P01' || error.message?.includes('relation') || error.message?.includes('does not exist')) {
+      const relationMatch = error.message?.match(/relation "(\w+)" does not exist/);
+      const relationName = relationMatch ? relationMatch[1] : 'table';
+      
+      console.error('\n🔍 Table/Relation Not Found:');
+      console.error(`   The table "${relationName}" does not exist in the database.`);
+      console.error(`   Error code: ${error.code || 'N/A'}`);
+      console.error('\n   This usually means the database schema hasn\'t been created yet.');
+      console.error('\n   Solutions:');
+      console.error('   1. Run migrations to create the schema:');
+      console.error('      npm run migration:run');
+      console.error('\n   2. Or enable synchronize temporarily (NOT recommended for production):');
+      console.error('      Add to .env: DATABASE_SYNCHRONIZE=true');
+      console.error('      Then run the seeder again');
+      console.error('\n   3. Manually create tables using migrations:');
+      console.error(`      npx typeorm migration:run -d path/to/data-source`);
+      console.error('\n   ⚠️  Note: synchronize=true is dangerous in production as it can');
+      console.error('      drop and recreate tables. Use migrations instead.');
+      
+    } else if (error.code === '3D000' || error.message?.includes('database') || error.message?.toLowerCase().includes('database does not exist')) {
       const dbName = process.env.DATABASE_NAME || 'homemadefood_db';
       console.error('\n🔍 Database Connection Issue:');
       console.error(`   Database name: "${dbName}"`);
