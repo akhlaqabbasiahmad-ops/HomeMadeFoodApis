@@ -198,13 +198,24 @@ export class DatabaseSeeder {
 
     if (restaurants.length === 0 || categories.length === 0) {
       console.log('No restaurants or categories found, skipping food items seeding');
+      console.log(`  Restaurants: ${restaurants.length}, Categories: ${categories.length}`);
       return;
     }
+
+    console.log(`Found ${restaurants.length} restaurants and ${categories.length} categories for food items seeding`);
 
     const mariosRestaurant = restaurants.find(r => r.name.includes("Mario's"));
     const dragonPalace = restaurants.find(r => r.name.includes("Dragon"));
     const tacoFiesta = restaurants.find(r => r.name.includes("Taco"));
     const burgerJunction = restaurants.find(r => r.name.includes("Burger"));
+
+    if (!mariosRestaurant || !dragonPalace || !tacoFiesta || !burgerJunction) {
+      console.log('⚠️  Warning: Some restaurants not found:');
+      console.log(`  Mario's: ${mariosRestaurant ? 'Found' : 'Missing'}`);
+      console.log(`  Dragon Palace: ${dragonPalace ? 'Found' : 'Missing'}`);
+      console.log(`  Taco Fiesta: ${tacoFiesta ? 'Found' : 'Missing'}`);
+      console.log(`  Burger Junction: ${burgerJunction ? 'Found' : 'Missing'}`);
+    }
 
     const italianCategory = categories.find(c => c.name === 'Italian');
     const chineseCategory = categories.find(c => c.name === 'Chinese');
@@ -412,8 +423,15 @@ export class DatabaseSeeder {
       },
     ];
 
+    let createdCount = 0;
+    let skippedCount = 0;
+    
     for (const itemData of foodItems) {
-      if (!itemData.restaurantId) continue;
+      if (!itemData.restaurantId) {
+        console.log(`⚠️  Skipping ${itemData.name} - no restaurant ID`);
+        skippedCount++;
+        continue;
+      }
 
       const existingItem = await foodItemRepository.findOne({
         where: { 
@@ -425,9 +443,15 @@ export class DatabaseSeeder {
       if (!existingItem) {
         const foodItem = foodItemRepository.create(itemData);
         await foodItemRepository.save(foodItem);
-        console.log(`Created food item: ${itemData.name}`);
+        console.log(`✅ Created food item: ${itemData.name} (${itemData.restaurantName})`);
+        createdCount++;
+      } else {
+        console.log(`⏭️  Food item already exists: ${itemData.name}`);
+        skippedCount++;
       }
     }
+    
+    console.log(`📊 Food items seeding summary: Created: ${createdCount}, Skipped: ${skippedCount}, Total: ${foodItems.length}`);
   }
 
   private async seedOrders(): Promise<void> {

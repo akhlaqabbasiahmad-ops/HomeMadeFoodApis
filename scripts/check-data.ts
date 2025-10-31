@@ -3,6 +3,7 @@ import { DataSource, DataSourceOptions } from 'typeorm';
 import * as dotenv from 'dotenv';
 import { Category } from '../src/infrastructure/database/entities/category.entity';
 import { RestaurantEntity } from '../src/infrastructure/database/entities/restaurant.entity';
+import { FoodItemEntity } from '../src/infrastructure/database/entities/food-item.entity';
 
 // Load .env file
 const envPaths = [
@@ -29,7 +30,7 @@ const getDatabaseConfig = (): DataSourceOptions => {
       username: process.env.DATABASE_USERNAME || 'postgres',
       password: process.env.DATABASE_PASSWORD || '',
       database: process.env.DATABASE_NAME || 'homemadefood_db',
-      entities: [Category, RestaurantEntity],
+      entities: [Category, RestaurantEntity, FoodItemEntity],
       synchronize: false,
       logging: false,
     };
@@ -83,6 +84,30 @@ async function checkData() {
       });
     } else {
       console.log('   ⚠️  No restaurants found!');
+    }
+
+    // Check food items
+    const foodItemRepo = dataSource.getRepository(FoodItemEntity);
+    const allFoodItems = await foodItemRepo.find();
+    const availableFoodItems = await foodItemRepo.find({ where: { isAvailable: true } });
+    const featuredFoodItems = await foodItemRepo.find({ where: { isFeatured: true } });
+    const popularFoodItems = await foodItemRepo.find({ where: { isPopular: true } });
+    
+    console.log('\n📊 Food Items:');
+    console.log(`   Total: ${allFoodItems.length}`);
+    console.log(`   Available: ${availableFoodItems.length}`);
+    console.log(`   Featured: ${featuredFoodItems.length}`);
+    console.log(`   Popular: ${popularFoodItems.length}`);
+    if (allFoodItems.length > 0) {
+      console.log('   Sample food items:');
+      allFoodItems.slice(0, 5).forEach(item => {
+        console.log(`     - ${item.name} (Available: ${item.isAvailable}, Featured: ${item.isFeatured}, Popular: ${item.isPopular})`);
+      });
+      if (allFoodItems.length > 5) {
+        console.log(`     ... and ${allFoodItems.length - 5} more`);
+      }
+    } else {
+      console.log('   ⚠️  No food items found!');
     }
 
     await dataSource.destroy();
