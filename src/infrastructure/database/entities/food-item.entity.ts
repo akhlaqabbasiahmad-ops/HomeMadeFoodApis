@@ -24,7 +24,7 @@ export class FoodItemEntity {
   @Column({ type: 'decimal', precision: 3, scale: 2, default: 0 })
   rating: number;
 
-  @Column({ type: 'int', default: 0 })
+  @Column({ type: 'integer', default: 0 })
   reviews: number;
 
   @Column({ type: 'varchar', length: 50 })
@@ -51,10 +51,10 @@ export class FoodItemEntity {
   @Column({ type: 'boolean', default: false })
   isSpicy: boolean;
 
-  @Column({ type: 'int' })
+  @Column({ type: 'integer' })
   preparationTime: number;
 
-  @Column({ type: 'int', nullable: true })
+  @Column({ type: 'integer', nullable: true })
   calories: number;
 
   @Column({ type: 'boolean', default: true })

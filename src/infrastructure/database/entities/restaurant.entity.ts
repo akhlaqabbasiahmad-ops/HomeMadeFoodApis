@@ -18,7 +18,7 @@ export class RestaurantEntity {
   @Column({ type: 'decimal', precision: 3, scale: 2, default: 0 })
   rating: number;
 
-  @Column({ type: 'int', default: 0 })
+  @Column({ type: 'integer', default: 0 })
   reviews: number;
 
   @Column({ type: 'varchar', length: 50 })
