@@ -57,10 +57,10 @@ export class Order {
   @Column()
   paymentMethod: string;
 
-  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  @Column({ type: 'datetime', default: () => 'CURRENT_TIMESTAMP' })
   orderDate: Date;
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: 'datetime', nullable: true })
   estimatedDeliveryTime: Date;
 
   @Column({ nullable: true })
@@ -69,7 +69,7 @@ export class Order {
   @Column('text', { nullable: true })
   specialInstructions: string;
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: 'datetime', nullable: true })
   actualDeliveryTime: Date;
 
   @CreateDateColumn()
