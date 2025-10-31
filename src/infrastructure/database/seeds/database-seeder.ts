@@ -26,16 +26,16 @@ export class DatabaseSeeder {
     const categoryRepository = this.dataSource.getRepository(Category);
     
     const categories = [
-      { name: 'Italian', description: 'Traditional Italian cuisine', icon: 'restaurant' },
-      { name: 'Asian', description: 'Asian fusion and traditional dishes', icon: 'leaf' },
-      { name: 'Mexican', description: 'Authentic Mexican food', icon: 'flame' },
-      { name: 'American', description: 'Classic American dishes', icon: 'fast-food' },
-      { name: 'Pizza', description: 'Fresh baked pizzas', icon: 'pizza' },
-      { name: 'Desserts', description: 'Sweet treats and desserts', icon: 'ice-cream' },
-      { name: 'Beverages', description: 'Drinks and beverages', icon: 'wine' },
-      { name: 'Indian', description: 'Spicy and flavorful Indian cuisine', icon: 'flame' },
-      { name: 'Mediterranean', description: 'Healthy Mediterranean dishes', icon: 'leaf' },
-      { name: 'Chinese', description: 'Traditional Chinese cuisine', icon: 'restaurant' },
+      { name: 'Italian', description: 'Traditional Italian cuisine', icon: 'restaurant', isActive: true },
+      { name: 'Asian', description: 'Asian fusion and traditional dishes', icon: 'leaf', isActive: true },
+      { name: 'Mexican', description: 'Authentic Mexican food', icon: 'flame', isActive: true },
+      { name: 'American', description: 'Classic American dishes', icon: 'fast-food', isActive: true },
+      { name: 'Pizza', description: 'Fresh baked pizzas', icon: 'pizza', isActive: true },
+      { name: 'Desserts', description: 'Sweet treats and desserts', icon: 'ice-cream', isActive: true },
+      { name: 'Beverages', description: 'Drinks and beverages', icon: 'wine', isActive: true },
+      { name: 'Indian', description: 'Spicy and flavorful Indian cuisine', icon: 'flame', isActive: true },
+      { name: 'Mediterranean', description: 'Healthy Mediterranean dishes', icon: 'leaf', isActive: true },
+      { name: 'Chinese', description: 'Traditional Chinese cuisine', icon: 'restaurant', isActive: true },
     ];
 
     for (const categoryData of categories) {
@@ -116,6 +116,7 @@ export class DatabaseSeeder {
         minimumOrder: 15.00,
         categories: ["Italian", "Pizza"],
         isOpen: true,
+        isActive: true,
         distance: 2.5,
         latitude: 40.7128,
         longitude: -74.0060,
@@ -132,6 +133,7 @@ export class DatabaseSeeder {
         minimumOrder: 20.00,
         categories: ["Chinese", "Asian"],
         isOpen: true,
+        isActive: true,
         distance: 3.2,
         latitude: 40.7589,
         longitude: -73.9851,
@@ -148,6 +150,7 @@ export class DatabaseSeeder {
         minimumOrder: 12.00,
         categories: ["Mexican"],
         isOpen: true,
+        isActive: true,
         distance: 1.8,
         latitude: 40.7505,
         longitude: -73.9934,
@@ -164,6 +167,7 @@ export class DatabaseSeeder {
         minimumOrder: 10.00,
         categories: ["American"],
         isOpen: true,
+        isActive: true,
         distance: 1.2,
         latitude: 40.7282,
         longitude: -73.7949,
