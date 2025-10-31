@@ -35,7 +35,10 @@ export class FoodService {
   }
 
   async getAllCategories() {
-    return await this.categoryRepository.find();
+    return await this.categoryRepository.find({
+      where: { isActive: true },
+      order: { name: 'ASC' },
+    });
   }
 
   async getFeaturedItems(limit: number = 10) {
