@@ -1,5 +1,6 @@
 import * as path from 'path';
 import { DataSource, DataSourceOptions } from 'typeorm';
+import * as dotenv from 'dotenv';
 import { DatabaseSeeder } from '../src/infrastructure/database/seeds/database-seeder';
 import { AddressEntity } from '../src/infrastructure/database/entities/address.entity';
 import { Category } from '../src/infrastructure/database/entities/category.entity';
@@ -8,6 +9,32 @@ import { OrderItem } from '../src/infrastructure/database/entities/order-item.en
 import { Order } from '../src/infrastructure/database/entities/order.entity';
 import { RestaurantEntity } from '../src/infrastructure/database/entities/restaurant.entity';
 import { UserEntity } from '../src/infrastructure/database/entities/user.entity';
+
+// Load .env file (looks for .env in project root)
+// Try multiple paths to find .env file
+const envPaths = [
+  path.join(__dirname, '../.env'),      // From scripts/ directory
+  path.join(process.cwd(), '.env'),    // From current working directory
+];
+
+let envLoaded = false;
+for (const envPath of envPaths) {
+  const result = dotenv.config({ path: envPath });
+  if (!result.error) {
+    envLoaded = true;
+    console.log(`📄 Loaded environment variables from ${envPath}`);
+    break;
+  }
+}
+
+// If no .env file found, try default location
+if (!envLoaded) {
+  const defaultResult = dotenv.config();
+  if (!defaultResult.error) {
+    envLoaded = true;
+    console.log(`📄 Loaded environment variables from default .env location`);
+  }
+}
 
 // Load environment variables
 const nodeEnv = process.env.NODE_ENV || 'development';
@@ -55,7 +82,19 @@ async function runSeeder() {
     // Validate required environment variables
     if (!process.env.DATABASE_PASSWORD) {
       console.error('❌ Error: DATABASE_PASSWORD environment variable is required for production');
-      console.error('   Please set DATABASE_PASSWORD in your environment or .env file');
+      if (!envLoaded) {
+        console.error('   ⚠️  No .env file was found or loaded.');
+        console.error('   Please ensure you have a .env file in the project root with DATABASE_PASSWORD set.');
+      } else {
+        console.error('   ⚠️  .env file was loaded, but DATABASE_PASSWORD is missing or empty.');
+        console.error('   Please add DATABASE_PASSWORD=your-password to your .env file.');
+      }
+      console.error('\n   Current values:');
+      console.error(`   - DATABASE_HOST: ${process.env.DATABASE_HOST || '(default: localhost)'}`);
+      console.error(`   - DATABASE_PORT: ${process.env.DATABASE_PORT || '(default: 5432)'}`);
+      console.error(`   - DATABASE_USERNAME: ${process.env.DATABASE_USERNAME || '(default: postgres)'}`);
+      console.error(`   - DATABASE_PASSWORD: ${process.env.DATABASE_PASSWORD ? '***' : '(MISSING)'}`);
+      console.error(`   - DATABASE_NAME: ${process.env.DATABASE_NAME || '(default: homemadefood_db)'}`);
       process.exit(1);
     }
     
