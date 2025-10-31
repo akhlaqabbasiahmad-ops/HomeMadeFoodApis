@@ -81,52 +81,7 @@ export class UserController {
     };
   }
 
-  @Get(':id')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get user by ID' })
-  @ApiResponse({ status: 200, description: 'User found' })
-  @ApiResponse({ status: 404, description: 'User not found' })
-  async findOne(@Param('id') id: string) {
-    const user = await this.userService.findUserById(id);
-    const { password, ...userWithoutPassword } = user as any;
-    return {
-      success: true,
-      data: userWithoutPassword,
-      message: 'User retrieved successfully',
-    };
-  }
-
-  @Patch(':id')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Update user' })
-  @ApiResponse({ status: 200, description: 'User updated successfully' })
-  @ApiResponse({ status: 404, description: 'User not found' })
-  async update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
-    const user = await this.userService.updateUser(id, updateUserDto);
-    const { password, ...userWithoutPassword } = user as any;
-    return {
-      success: true,
-      data: userWithoutPassword,
-      message: 'User updated successfully',
-    };
-  }
-
-  @Delete(':id')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Delete user' })
-  @ApiResponse({ status: 200, description: 'User deleted successfully' })
-  @ApiResponse({ status: 404, description: 'User not found' })
-  async remove(@Param('id') id: string) {
-    await this.userService.deleteUser(id);
-    return {
-      success: true,
-      message: 'User deleted successfully',
-    };
-  }
-
+  // Address routes must come before generic :id route to avoid route conflicts
   @Get(':id/addresses')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
@@ -171,6 +126,52 @@ export class UserController {
       success: true,
       data: address,
       message: 'Address created successfully',
+    };
+  }
+
+  @Get(':id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get user by ID' })
+  @ApiResponse({ status: 200, description: 'User found' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  async findOne(@Param('id') id: string) {
+    const user = await this.userService.findUserById(id);
+    const { password, ...userWithoutPassword } = user as any;
+    return {
+      success: true,
+      data: userWithoutPassword,
+      message: 'User retrieved successfully',
+    };
+  }
+
+  @Patch(':id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update user' })
+  @ApiResponse({ status: 200, description: 'User updated successfully' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  async update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
+    const user = await this.userService.updateUser(id, updateUserDto);
+    const { password, ...userWithoutPassword } = user as any;
+    return {
+      success: true,
+      data: userWithoutPassword,
+      message: 'User updated successfully',
+    };
+  }
+
+  @Delete(':id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Delete user' })
+  @ApiResponse({ status: 200, description: 'User deleted successfully' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  async remove(@Param('id') id: string) {
+    await this.userService.deleteUser(id);
+    return {
+      success: true,
+      message: 'User deleted successfully',
     };
   }
 }
