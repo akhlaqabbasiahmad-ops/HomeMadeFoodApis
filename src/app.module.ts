@@ -5,6 +5,7 @@ import { DatabaseModule } from './infrastructure/database/database.module';
 import { AdminModule } from './presentation/modules/admin.module';
 import { AuthModule } from './presentation/modules/auth.module';
 import { FoodModule } from './presentation/modules/food.module';
+import { MealSuggestionModule } from './presentation/modules/meal-suggestion.module';
 import { OrderModule } from './presentation/modules/order.module';
 
 @Module({
@@ -37,6 +38,7 @@ import { OrderModule } from './presentation/modules/order.module';
     AdminModule,
     AuthModule,
     FoodModule,
+    MealSuggestionModule,
     OrderModule,
   ],
   controllers: [],
