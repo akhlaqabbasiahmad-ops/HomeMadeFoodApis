@@ -11,7 +11,7 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { MealSuggestionService, MealSuggestion } from '../services/meal-suggestion.service';
+import { MealSuggestionService, DualMealSuggestion } from '../services/meal-suggestion.service';
 
 interface MealSuggestionQueryDto {
   dietaryRestrictions?: string;
@@ -26,8 +26,8 @@ export class MealSuggestionController {
 
   @Get('today')
   @ApiOperation({ 
-    summary: 'Get AI-suggested meal for today',
-    description: 'Uses AI to suggest the perfect meal for today based on time, day of week, and available food items'
+    summary: 'Get dual AI-suggested meals for today',
+    description: 'Returns two meal suggestions: 1) A meal from your app database, and 2) A traditional Pakistani meal suggestion based on current season, weather, and cultural context'
   })
   @ApiQuery({ 
     name: 'dietaryRestrictions', 
@@ -54,31 +54,50 @@ export class MealSuggestionController {
       example: {
         success: true,
         data: {
-          meal: {
-            name: 'Grilled Chicken Sandwich',
-            description: 'Delicious grilled chicken with fresh vegetables',
-            category: 'Sandwiches',
-            price: 12.99,
-            restaurantName: 'Food Haven',
-            id: 'uuid-here',
-            image: 'https://example.com/image.jpg',
-            rating: 4.5
+          fromApp: {
+            meal: {
+              name: 'Grilled Chicken Sandwich',
+              description: 'Delicious grilled chicken with fresh vegetables',
+              category: 'Sandwiches',
+              price: 12.99,
+              restaurantName: 'Food Haven',
+              id: 'uuid-here',
+              image: 'https://example.com/image.jpg',
+              rating: 4.5
+            },
+            reason: 'Perfect lunch choice for a Monday!',
+            nutritionalInfo: {
+              calories: 450,
+              isVegetarian: false,
+              isVegan: false,
+              isSpicy: false
+            }
           },
-          reason: 'Perfect lunch choice for a Monday!',
-          nutritionalInfo: {
-            calories: 450,
-            isVegetarian: false,
-            isVegan: false,
-            isSpicy: false
+          culturalSuggestion: {
+            name: 'Biryani',
+            description: 'Fragrant rice dish with meat or vegetables, layered with spices. Celebration meal.',
+            category: 'Traditional',
+            reason: 'Perfect for spring celebrations and gatherings',
+            culturalContext: 'Most beloved dish in Pakistan, served on special occasions',
+            season: 'Spring',
+            weather: 'Moderate',
+            estimatedPrice: 800,
+            nutritionalInfo: {
+              calories: 600,
+              isVegetarian: false,
+              isVegan: false,
+              isSpicy: true
+            },
+            image: 'https://source.unsplash.com/400x300/?pakistani+food+biryani'
           }
         },
-        message: 'Meal suggestion retrieved successfully'
+        message: 'Meal suggestions retrieved successfully'
       }
     }
   })
   async getTodayMealSuggestion(@Query() query: MealSuggestionQueryDto): Promise<{
     success: boolean;
-    data: MealSuggestion;
+    data: DualMealSuggestion;
     message: string;
   }> {
     const userPreferences = {
@@ -102,8 +121,8 @@ export class MealSuggestionController {
 
   @Post('suggest')
   @ApiOperation({ 
-    summary: 'Get AI-suggested meal with preferences',
-    description: 'Uses AI to suggest a meal based on user preferences and available food items'
+    summary: 'Get dual AI-suggested meals with preferences',
+    description: 'Returns two meal suggestions based on preferences: 1) From your app database, and 2) Traditional Pakistani meal based on season, weather, and culture'
   })
   @ApiResponse({ 
     status: 200, 
@@ -115,7 +134,7 @@ export class MealSuggestionController {
     maxPrice?: number;
   }): Promise<{
     success: boolean;
-    data: MealSuggestion;
+    data: DualMealSuggestion;
     message: string;
   }> {
     const suggestion = await this.mealSuggestionService.suggestTodayMeal(preferences);

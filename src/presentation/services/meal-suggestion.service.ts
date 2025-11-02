@@ -25,6 +25,27 @@ export interface MealSuggestion {
   };
 }
 
+export interface DualMealSuggestion {
+  fromApp: MealSuggestion;
+  culturalSuggestion: {
+    name: string;
+    description: string;
+    category: string;
+    reason: string;
+    culturalContext: string;
+    season: string;
+    weather: string;
+    estimatedPrice?: number;
+    nutritionalInfo?: {
+      calories?: number;
+      isVegetarian?: boolean;
+      isVegan?: boolean;
+      isSpicy?: boolean;
+    };
+    image?: string;
+  };
+}
+
 @Injectable()
 export class MealSuggestionService {
   private readonly logger = new Logger(MealSuggestionService.name);
@@ -44,7 +65,7 @@ export class MealSuggestionService {
     dietaryRestrictions?: string[];
     favoriteCategories?: string[];
     maxPrice?: number;
-  }): Promise<MealSuggestion> {
+  }): Promise<DualMealSuggestion> {
     try {
       // Get available food items from database
       const availableItems = await this.foodRepository.find({
@@ -68,8 +89,11 @@ export class MealSuggestionService {
         throw new Error('No available food items found');
       }
 
+      // Shuffle items to add variety (avoid always selecting same top-rated items)
+      const shuffledOptions = this.shuffleArray([...allFoodOptions]);
+
       // Filter by user preferences if provided
-      let filteredItems = allFoodOptions;
+      let filteredItems = shuffledOptions;
       
       if (userPreferences) {
         if (userPreferences.maxPrice) {
@@ -118,15 +142,42 @@ export class MealSuggestionService {
         filteredItems = allFoodOptions; // Fallback to all items if filters too strict
       }
 
-      // Use AI to suggest a meal
-      const suggestion = await this.getAISuggestion(filteredItems);
+      // Use AI to suggest a meal from app database
+      const appSuggestion = await this.getAISuggestion(filteredItems);
 
-      return suggestion;
+      // Get Pakistani cultural meal suggestion based on season and weather
+      const culturalSuggestion = await this.getPakistaniCulturalSuggestion(userPreferences);
+
+      return {
+        fromApp: appSuggestion,
+        culturalSuggestion: culturalSuggestion,
+      };
     } catch (error) {
       this.logger.error('Error in suggestTodayMeal', error);
       
       // Fallback: return a random popular/featured item
-      return await this.getFallbackSuggestion();
+      const fallbackAppSuggestion = await this.getFallbackSuggestion();
+      const fallbackCulturalSuggestion = await this.getPakistaniCulturalSuggestion(userPreferences).catch(() => ({
+        name: 'Biryani',
+        description: 'Traditional Pakistani rice dish with aromatic spices',
+        category: 'Traditional',
+        reason: 'A classic Pakistani comfort food perfect for any occasion',
+        culturalContext: 'Biryani is a beloved dish in Pakistan, often served during celebrations and family gatherings',
+        season: 'Year-round',
+        weather: 'Any',
+        estimatedPrice: 800,
+        nutritionalInfo: {
+          calories: 600,
+          isVegetarian: false,
+          isVegan: false,
+          isSpicy: true,
+        },
+      }));
+
+      return {
+        fromApp: fallbackAppSuggestion,
+        culturalSuggestion: fallbackCulturalSuggestion,
+      };
     }
   }
 
@@ -188,14 +239,18 @@ export class MealSuggestionService {
       };
     });
 
+    // Shuffle items summary order to prevent AI from always picking the same first item
+    const shuffledSummary = this.shuffleArray([...itemsSummary]);
+
     const prompt = `You are a food recommendation assistant. Today is ${dayOfWeek} and it's time for ${mealTime}.
     
-Available food options:
-${itemsSummary.map((item, idx) => 
+Available food options (presented in random order):
+${shuffledSummary.map((item, idx) => 
   `${idx + 1}. ${item.name} - ${item.category} - $${item.price} - Rating: ${item.rating}/5 - ${item.description.substring(0, 80)}`
 ).join('\n')}
 
 Based on the day (${dayOfWeek}), meal time (${mealTime}), ratings, and descriptions, suggest ONE best meal option.
+IMPORTANT: Consider variety - don't always pick the highest rated item. Consider different categories, price ranges, and try to surprise the user with a great but diverse selection. Vary your recommendations.
 Respond in JSON format:
 {
   "selectedMealName": "exact name from list",
@@ -216,14 +271,14 @@ Respond in JSON format:
           messages: [
             {
               role: 'system',
-              content: 'You are a helpful food recommendation assistant. Always respond with valid JSON only.',
+              content: 'You are a helpful food recommendation assistant. Always respond with valid JSON only. Always provide variety in recommendations.',
             },
             {
               role: 'user',
               content: prompt,
             },
           ],
-          temperature: 0.7,
+          temperature: 0.9, // Higher temperature for more variety and creativity
           max_tokens: 300,
         },
         {
@@ -254,10 +309,26 @@ Respond in JSON format:
         throw new Error('Invalid AI response format');
       }
 
-      // Find the selected item
-      const selectedItem = items.find(
+      // Find the selected item - if not found, randomly select from top 5 rated items for variety
+      let selectedItem = items.find(
         item => item.name.toLowerCase() === aiResponse.selectedMealName?.toLowerCase()
-      ) || items[0];
+      );
+      
+      if (!selectedItem) {
+        // If AI response doesn't match, randomly pick from top 5 items for variety
+        const topItems = items
+          .sort((a, b) => {
+            const isInternalA = 'id' in a && 'restaurantName' in a;
+            const isInternalB = 'id' in b && 'restaurantName' in b;
+            const ratingA = isInternalA ? parseFloat(a.rating.toString()) : (a.rating || 0);
+            const ratingB = isInternalB ? parseFloat(b.rating.toString()) : (b.rating || 0);
+            return ratingB - ratingA;
+          })
+          .slice(0, 5);
+        const shuffled = this.shuffleArray(topItems);
+        selectedItem = shuffled[0];
+        this.logger.debug('AI response did not match any item, randomly selected from top 5');
+      }
 
       const isInternal = 'id' in selectedItem && 'restaurantName' in selectedItem;
 
@@ -344,7 +415,7 @@ Respond in JSON format:
               content: prompt,
             },
           ],
-          temperature: 0.7,
+          temperature: 0.9, // Higher temperature for more variety and creativity
           max_tokens: 300,
         },
         {
@@ -373,10 +444,26 @@ Respond in JSON format:
         throw new Error('Invalid AI response format');
       }
 
-      // Find the selected item
-      const selectedItem = items.find(
+      // Find the selected item - if not found, randomly select from top 5 rated items for variety
+      let selectedItem = items.find(
         item => item.name.toLowerCase() === aiResponse.selectedMealName?.toLowerCase()
-      ) || items[0];
+      );
+      
+      if (!selectedItem) {
+        // If AI response doesn't match, randomly pick from top 5 items for variety
+        const topItems = items
+          .sort((a, b) => {
+            const isInternalA = 'id' in a && 'restaurantName' in a;
+            const isInternalB = 'id' in b && 'restaurantName' in b;
+            const ratingA = isInternalA ? parseFloat(a.rating.toString()) : (a.rating || 0);
+            const ratingB = isInternalB ? parseFloat(b.rating.toString()) : (b.rating || 0);
+            return ratingB - ratingA;
+          })
+          .slice(0, 5);
+        const shuffled = this.shuffleArray(topItems);
+        selectedItem = shuffled[0];
+        this.logger.debug('AI response did not match any item, randomly selected from top 5');
+      }
 
       const isInternal = 'id' in selectedItem && 'restaurantName' in selectedItem;
 
@@ -864,7 +951,7 @@ Respond in JSON format:
     }
     
     if (!selectedItem) {
-      // Sort by rating and select from top 3
+      // Sort by rating and select from top 10 (increased from 3 for more variety)
       const sortedItems = [...items].sort((a, b) => {
         const isInternalA = 'id' in a && 'restaurantName' in a;
         const isInternalB = 'id' in b && 'restaurantName' in b;
@@ -872,12 +959,15 @@ Respond in JSON format:
         const ratingB = isInternalB ? parseFloat(b.rating.toString()) : (b.rating || 0);
         return ratingB - ratingA;
       });
-      const topItems = sortedItems.slice(0, 3);
-      selectedItem = topItems[Math.floor(Math.random() * topItems.length)];
+      const topItems = sortedItems.slice(0, 10);
+      const shuffled = this.shuffleArray(topItems);
+      selectedItem = shuffled[0];
     }
 
     if (!selectedItem) {
-      selectedItem = items[Math.floor(Math.random() * items.length)];
+      // Random selection from all items
+      const shuffled = this.shuffleArray([...items]);
+      selectedItem = shuffled[0];
     }
 
     const isInternal = 'id' in selectedItem && 'restaurantName' in selectedItem;
@@ -906,10 +996,19 @@ Respond in JSON format:
     };
   }
 
+  private shuffleArray<T>(array: T[]): T[] {
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+  }
+
   private async getFallbackSuggestion(): Promise<MealSuggestion> {
     const items = await this.foodRepository.find({
       where: { isAvailable: true },
-      take: 1,
+      take: 20, // Get more items for variety
       order: { rating: 'DESC' },
     });
 
@@ -917,7 +1016,10 @@ Respond in JSON format:
       throw new Error('No food items available');
     }
 
-    const item = items[0];
+    // Randomly select from top 5 items for variety instead of always top 1
+    const topItems = items.slice(0, 5);
+    const shuffled = this.shuffleArray(topItems);
+    const item = shuffled[0];
     return {
       meal: {
         name: item.name,
@@ -949,13 +1051,15 @@ Respond in JSON format:
       }
     }
 
-    // If no match, return top rated item
+    // If no match, randomly return from top 5 rated items for variety
     const sortedItems = [...items].sort((a, b) => {
       const ratingA = 'rating' in a ? parseFloat(a.rating.toString()) : (a.rating || 0);
       const ratingB = 'rating' in b ? parseFloat(b.rating.toString()) : (b.rating || 0);
       return ratingB - ratingA;
     });
-    return sortedItems[0];
+    const topItems = sortedItems.slice(0, 5);
+    const shuffled = this.shuffleArray(topItems);
+    return shuffled[0];
   }
 
   private extractReasonFromAI(aiResponse: string): string {
@@ -1032,6 +1136,457 @@ Respond in JSON format:
     return reasons.length > 0 
       ? reasons[Math.floor(Math.random() * reasons.length)]
       : `Perfect ${mealTime} choice for ${dayOfWeek}!`;
+  }
+
+  private async getPakistaniCulturalSuggestion(userPreferences?: {
+    dietaryRestrictions?: string[];
+    favoriteCategories?: string[];
+    maxPrice?: number;
+  }): Promise<DualMealSuggestion['culturalSuggestion']> {
+    try {
+      // Get current season and weather for Pakistan
+      const season = this.getPakistanSeason();
+      const weather = await this.getPakistanWeather();
+
+      // Get current time context
+      const today = new Date();
+      const dayOfWeek = today.toLocaleDateString('en-US', { weekday: 'long' });
+      const currentHour = today.getHours();
+      let mealTime = 'lunch';
+      if (currentHour < 10) mealTime = 'breakfast';
+      else if (currentHour >= 10 && currentHour < 15) mealTime = 'lunch';
+      else if (currentHour >= 15 && currentHour < 20) mealTime = 'dinner';
+      else mealTime = 'dinner';
+
+      // Build dietary restrictions context
+      let dietaryContext = '';
+      if (userPreferences?.dietaryRestrictions) {
+        if (userPreferences.dietaryRestrictions.includes('vegetarian')) {
+          dietaryContext = 'vegetarian';
+        } else if (userPreferences.dietaryRestrictions.includes('vegan')) {
+          dietaryContext = 'vegan';
+        }
+      }
+
+      const prompt = `You are a Pakistani food culture expert. Suggest a traditional Pakistani meal for ${mealTime} on ${dayOfWeek}.
+
+Context:
+- Season: ${season}
+- Weather: ${weather}
+- Meal time: ${mealTime}
+- Day: ${dayOfWeek}
+${dietaryContext ? `- Dietary preference: ${dietaryContext}` : ''}
+
+Suggest a traditional Pakistani dish that:
+1. Is culturally appropriate for the current season and weather
+2. Is commonly eaten in Pakistan for ${mealTime}
+3. Reflects authentic Pakistani cuisine
+${dietaryContext ? `4. Is ${dietaryContext}` : '4. Can be meat or vegetarian based on what\'s best for the season'}
+
+Respond in JSON format:
+{
+  "name": "Pakistani dish name in English",
+  "urduName": "Pakistani dish name in Urdu (optional)",
+  "description": "Detailed description of the dish and why it's perfect for this season/weather",
+  "category": "Category (e.g., Traditional, Street Food, Home Cooking)",
+  "reason": "Why this dish is perfect for ${dayOfWeek} ${mealTime} considering season (${season}) and weather (${weather})",
+  "culturalContext": "Cultural significance and when/why Pakistanis typically eat this dish",
+  "estimatedPrice": approximate price in PKR,
+  "calories": approximate calories,
+  "isVegetarian": boolean,
+  "isVegan": boolean,
+  "isSpicy": boolean,
+  "ingredients": ["key ingredient 1", "key ingredient 2", ...]
+}`;
+
+      // Use OpenRouter or fallback to OpenAI
+      const openRouterApiKey = this.configService.get<string>('OPENROUTER_API_KEY');
+      const openaiApiKey = this.configService.get<string>('OPENAI_API_KEY');
+      const anthropicApiKey = this.configService.get<string>('ANTHROPIC_API_KEY');
+
+      let aiResponse: any;
+      
+      if (openRouterApiKey) {
+        aiResponse = await this.getCulturalSuggestionFromOpenRouter(prompt, openRouterApiKey);
+      } else if (openaiApiKey) {
+        aiResponse = await this.getCulturalSuggestionFromOpenAI(prompt, openaiApiKey);
+      } else if (anthropicApiKey) {
+        aiResponse = await this.getCulturalSuggestionFromAnthropic(prompt, anthropicApiKey);
+      } else {
+        // Fallback to default suggestion based on season
+        return this.getDefaultPakistaniMeal(season, weather, mealTime);
+      }
+
+      return {
+        name: aiResponse.name || 'Pakistani Traditional Meal',
+        description: aiResponse.description || 'A delicious Pakistani dish perfect for this time',
+        category: aiResponse.category || 'Traditional',
+        reason: aiResponse.reason || `Perfect ${mealTime} choice for ${season}`,
+        culturalContext: aiResponse.culturalContext || 'A traditional Pakistani favorite',
+        season: season,
+        weather: weather,
+        estimatedPrice: aiResponse.estimatedPrice || 500,
+        nutritionalInfo: {
+          calories: aiResponse.calories || undefined,
+          isVegetarian: aiResponse.isVegetarian || false,
+          isVegan: aiResponse.isVegan || false,
+          isSpicy: aiResponse.isSpicy !== undefined ? aiResponse.isSpicy : true,
+        },
+        image: `https://source.unsplash.com/400x300/?pakistani+food+${encodeURIComponent(aiResponse.name || 'biryani')}`,
+      };
+    } catch (error) {
+      this.logger.error('Error getting Pakistani cultural suggestion', error);
+      // Return default based on season
+      const season = this.getPakistanSeason();
+      const weather = await this.getPakistanWeather().catch(() => 'Moderate');
+      const today = new Date();
+      const currentHour = today.getHours();
+      let mealTime = 'lunch';
+      if (currentHour < 10) mealTime = 'breakfast';
+      else if (currentHour >= 15) mealTime = 'dinner';
+      
+      return this.getDefaultPakistaniMeal(season, weather, mealTime);
+    }
+  }
+
+  private async getCulturalSuggestionFromOpenRouter(prompt: string, apiKey: string): Promise<any> {
+    const model = this.configService.get<string>('OPENROUTER_MODEL') || 'openai/gpt-3.5-turbo';
+    
+    const response = await this.httpClient.post(
+      'https://openrouter.ai/api/v1/chat/completions',
+      {
+        model: model,
+        messages: [
+          {
+            role: 'system',
+            content: 'You are an expert on Pakistani cuisine and culture. Always respond with valid JSON only.',
+          },
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ],
+        temperature: 0.8,
+        max_tokens: 500,
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+          'HTTP-Referer': this.configService.get<string>('APP_URL') || 'https://homemadefood.app',
+          'X-Title': 'HomeMadeFood Pakistani Meal Suggestions',
+        },
+        timeout: 20000,
+      }
+    );
+
+    const aiContent = response.data.choices[0]?.message?.content || '';
+    const jsonMatch = aiContent.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]);
+    }
+    throw new Error('Invalid AI response format');
+  }
+
+  private async getCulturalSuggestionFromOpenAI(prompt: string, apiKey: string): Promise<any> {
+    const response = await this.httpClient.post(
+      'https://api.openai.com/v1/chat/completions',
+      {
+        model: 'gpt-3.5-turbo',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are an expert on Pakistani cuisine and culture. Always respond with valid JSON only.',
+          },
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ],
+        temperature: 0.8,
+        max_tokens: 500,
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        timeout: 20000,
+      }
+    );
+
+    const aiContent = response.data.choices[0]?.message?.content || '';
+    const jsonMatch = aiContent.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]);
+    }
+    throw new Error('Invalid AI response format');
+  }
+
+  private async getCulturalSuggestionFromAnthropic(prompt: string, apiKey: string): Promise<any> {
+    const response = await this.httpClient.post(
+      'https://api.anthropic.com/v1/messages',
+      {
+        model: 'claude-3-haiku-20240307',
+        max_tokens: 500,
+        messages: [
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ],
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+        },
+        timeout: 20000,
+      }
+    );
+
+    const aiContent = response.data.content[0]?.text || '';
+    const jsonMatch = aiContent.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]);
+    }
+    throw new Error('Invalid AI response format');
+  }
+
+  private getPakistanSeason(): string {
+    const today = new Date();
+    const month = today.getMonth() + 1; // 1-12
+
+    // Pakistan seasons:
+    // Winter: December (12), January (1), February (2)
+    // Spring: March (3), April (4), May (5)
+    // Summer: June (6), July (7), August (8)
+    // Autumn: September (9), October (10), November (11)
+
+    if (month === 12 || month <= 2) {
+      return 'Winter';
+    } else if (month >= 3 && month <= 5) {
+      return 'Spring';
+    } else if (month >= 6 && month <= 8) {
+      return 'Summer';
+    } else {
+      return 'Autumn';
+    }
+  }
+
+  private async getPakistanWeather(): Promise<string> {
+    try {
+      // Try to get weather from OpenWeatherMap or similar
+      const weatherApiKey = this.configService.get<string>('WEATHER_API_KEY');
+      
+      if (weatherApiKey) {
+        // Using OpenWeatherMap - Karachi as default city (can be made configurable)
+        const response = await this.httpClient.get(
+          `https://api.openweathermap.org/data/2.5/weather`,
+          {
+            params: {
+              q: 'Karachi,Pakistan',
+              appid: weatherApiKey,
+              units: 'metric',
+            },
+            timeout: 5000,
+          }
+        );
+
+        const temp = response.data.main.temp;
+        const condition = response.data.weather[0].main.toLowerCase();
+        
+        if (temp > 30) return 'Hot';
+        if (temp > 20) return 'Warm';
+        if (temp > 10) return 'Moderate';
+        return 'Cool';
+      }
+
+      // Fallback: determine weather based on season
+      const season = this.getPakistanSeason();
+      if (season === 'Summer') return 'Hot';
+      if (season === 'Winter') return 'Cool';
+      if (season === 'Spring') return 'Moderate';
+      return 'Warm';
+    } catch (error) {
+      // Fallback based on season
+      const season = this.getPakistanSeason();
+      if (season === 'Summer') return 'Hot';
+      if (season === 'Winter') return 'Cool';
+      return 'Moderate';
+    }
+  }
+
+  private getDefaultPakistaniMeal(season: string, weather: string, mealTime: string): DualMealSuggestion['culturalSuggestion'] {
+    // Default suggestions based on season and meal time
+    const meals: Record<string, any> = {
+      'winter-breakfast': {
+        name: 'Halwa Puri with Chana',
+        description: 'Traditional Pakistani breakfast with sweet semolina halwa, fried bread, and spicy chickpeas. Perfect for cold winter mornings.',
+        category: 'Breakfast',
+        reason: 'A hearty winter breakfast that provides warmth and energy',
+        culturalContext: 'A Sunday morning favorite in Pakistani households, especially during winter months',
+        estimatedPrice: 200,
+        calories: 450,
+        isVegetarian: true,
+        isVegan: false,
+        isSpicy: true,
+      },
+      'winter-lunch': {
+        name: 'Nihari',
+        description: 'Slow-cooked beef or mutton stew with aromatic spices, perfect for cold weather. Served with naan.',
+        category: 'Traditional',
+        reason: 'A warming dish perfect for cold winter days',
+        culturalContext: 'Nihari is traditionally eaten for breakfast but also popular for lunch, especially in winter',
+        estimatedPrice: 800,
+        calories: 650,
+        isVegetarian: false,
+        isVegan: false,
+        isSpicy: true,
+      },
+      'winter-dinner': {
+        name: 'Haleem',
+        description: 'Slow-cooked lentil and meat stew, rich and nutritious. Perfect comfort food for cold evenings.',
+        category: 'Traditional',
+        reason: 'Warming and hearty, ideal for winter dinners',
+        culturalContext: 'Especially popular during Ramadan and cold months',
+        estimatedPrice: 600,
+        calories: 500,
+        isVegetarian: false,
+        isVegan: false,
+        isSpicy: true,
+      },
+      'summer-breakfast': {
+        name: 'Paratha with Yogurt and Pickle',
+        description: 'Flaky flatbread with cool yogurt and tangy pickle. Light and refreshing for hot mornings.',
+        category: 'Breakfast',
+        reason: 'Light and refreshing breakfast for hot summer days',
+        culturalContext: 'Common summer breakfast in Pakistani homes',
+        estimatedPrice: 150,
+        calories: 300,
+        isVegetarian: true,
+        isVegan: false,
+        isSpicy: false,
+      },
+      'summer-lunch': {
+        name: 'Daal Chawal with Raita',
+        description: 'Simple lentil curry with rice and cool yogurt dip. Comforting and hydrating.',
+        category: 'Home Cooking',
+        reason: 'Light and hydrating meal perfect for hot weather',
+        culturalContext: 'Staple comfort food in Pakistani households, especially in summer',
+        estimatedPrice: 250,
+        calories: 400,
+        isVegetarian: true,
+        isVegan: true,
+        isSpicy: false,
+      },
+      'summer-dinner': {
+        name: 'Chicken Karahi',
+        description: 'Spicy chicken cooked in a wok with tomatoes and green chilies. Popular summer evening meal.',
+        category: 'Traditional',
+        reason: 'Fresh and flavorful, perfect for summer dinners',
+        culturalContext: 'One of the most popular dishes in Pakistan, especially in summer',
+        estimatedPrice: 900,
+        calories: 550,
+        isVegetarian: false,
+        isVegan: false,
+        isSpicy: true,
+      },
+      'spring-breakfast': {
+        name: 'Chai with Paratha and Omelette',
+        description: 'Traditional Pakistani tea with bread and egg omelette. Perfect spring morning meal.',
+        category: 'Breakfast',
+        reason: 'Balanced breakfast for moderate spring weather',
+        culturalContext: 'Everyday breakfast in Pakistani homes',
+        estimatedPrice: 200,
+        calories: 350,
+        isVegetarian: false,
+        isVegan: false,
+        isSpicy: false,
+      },
+      'spring-lunch': {
+        name: 'Biryani',
+        description: 'Fragrant rice dish with meat or vegetables, layered with spices. Celebration meal.',
+        category: 'Traditional',
+        reason: 'Perfect for spring celebrations and gatherings',
+        culturalContext: 'Most beloved dish in Pakistan, served on special occasions',
+        estimatedPrice: 800,
+        calories: 600,
+        isVegetarian: false,
+        isVegan: false,
+        isSpicy: true,
+      },
+      'spring-dinner': {
+        name: 'Seekh Kebab with Naan',
+        description: 'Grilled spiced meat skewers with fresh bread. Spring evening favorite.',
+        category: 'BBQ',
+        reason: 'Ideal for pleasant spring evenings',
+        culturalContext: 'Popular for outdoor dining in spring weather',
+        estimatedPrice: 700,
+        calories: 500,
+        isVegetarian: false,
+        isVegan: false,
+        isSpicy: true,
+      },
+      'autumn-breakfast': {
+        name: 'Aloo Paratha with Chai',
+        description: 'Potato-stuffed flatbread with hot tea. Comforting autumn breakfast.',
+        category: 'Breakfast',
+        reason: 'Warming breakfast for cool autumn mornings',
+        culturalContext: 'Classic comfort breakfast, especially popular in autumn',
+        estimatedPrice: 150,
+        calories: 380,
+        isVegetarian: true,
+        isVegan: false,
+        isSpicy: false,
+      },
+      'autumn-lunch': {
+        name: 'Chapli Kebab with Rice',
+        description: 'Spiced ground meat patties with rice. Satisfying autumn lunch.',
+        category: 'BBQ',
+        reason: 'Hearty meal for moderate autumn weather',
+        culturalContext: 'Popular street food and home-cooked meal',
+        estimatedPrice: 600,
+        calories: 520,
+        isVegetarian: false,
+        isVegan: false,
+        isSpicy: true,
+      },
+      'autumn-dinner': {
+        name: 'Pulao with Chicken',
+        description: 'Spiced rice with tender chicken pieces. Comforting autumn dinner.',
+        category: 'Traditional',
+        reason: 'Warm and comforting for autumn evenings',
+        culturalContext: 'Simpler version of biryani, popular in all seasons',
+        estimatedPrice: 750,
+        calories: 580,
+        isVegetarian: false,
+        isVegan: false,
+        isSpicy: false,
+      },
+    };
+
+    const key = `${season.toLowerCase()}-${mealTime}`;
+    const meal = meals[key] || meals['spring-lunch'];
+
+    return {
+      name: meal.name,
+      description: meal.description,
+      category: meal.category,
+      reason: meal.reason,
+      culturalContext: meal.culturalContext,
+      season: season,
+      weather: weather,
+      estimatedPrice: meal.estimatedPrice,
+      nutritionalInfo: {
+        calories: meal.calories,
+        isVegetarian: meal.isVegetarian,
+        isVegan: meal.isVegan,
+        isSpicy: meal.isSpicy,
+      },
+      image: `https://source.unsplash.com/400x300/?pakistani+food+${encodeURIComponent(meal.name.toLowerCase().replace(/\s+/g, '+'))}`,
+    };
   }
 }
 
