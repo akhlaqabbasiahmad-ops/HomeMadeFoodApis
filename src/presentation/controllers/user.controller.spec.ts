@@ -3,7 +3,7 @@ import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UserController } from './user.controller';
-import { UserService } from '../modules/user.module';
+import { UserService } from '../services/user.service';
 import { AddressService } from '../services/address.service';
 import { AddressEntity } from '../../infrastructure/database/entities/address.entity';
 import { UserEntity } from '../../infrastructure/database/entities/user.entity';

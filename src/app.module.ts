@@ -7,6 +7,7 @@ import { AuthModule } from './presentation/modules/auth.module';
 import { FoodModule } from './presentation/modules/food.module';
 import { MealSuggestionModule } from './presentation/modules/meal-suggestion.module';
 import { OrderModule } from './presentation/modules/order.module';
+import { UserModule } from './presentation/modules/user.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { OrderModule } from './presentation/modules/order.module';
     FoodModule,
     MealSuggestionModule,
     OrderModule,
+    UserModule,
   ],
   controllers: [],
   providers: [],
