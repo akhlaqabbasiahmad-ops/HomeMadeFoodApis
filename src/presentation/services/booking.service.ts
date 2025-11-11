@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { BookingEntity, BookingStatus } from '../../infrastructure/database/entities/booking.entity';
 import { BookingServiceItemEntity } from '../../infrastructure/database/entities/booking-service-item.entity';
-import { CreateBookingDto, GetBookingsQueryDto } from '../../application/dto/booking.dto';
+import { CreateBookingDto, GetBookingsQueryDto, UpdateBookingStatusDto, UpdateBookingDto } from '../../application/dto/booking.dto';
 
 @Injectable()
 export class BookingService {
@@ -95,6 +95,80 @@ export class BookingService {
     }
 
     return booking;
+  }
+
+  async updateBookingStatus(id: string, updateStatusDto: UpdateBookingStatusDto): Promise<BookingEntity> {
+    const booking = await this.bookingRepository.findOne({
+      where: { id },
+      relations: ['services'],
+    });
+
+    if (!booking) {
+      throw new NotFoundException(`Booking with ID ${id} not found`);
+    }
+
+    booking.status = updateStatusDto.status;
+    await this.bookingRepository.save(booking);
+
+    return booking;
+  }
+
+  async updateBooking(id: string, updateBookingDto: UpdateBookingDto): Promise<BookingEntity> {
+    const booking = await this.bookingRepository.findOne({
+      where: { id },
+      relations: ['services'],
+    });
+
+    if (!booking) {
+      throw new NotFoundException(`Booking with ID ${id} not found`);
+    }
+
+    // Update basic fields
+    if (updateBookingDto.name !== undefined) {
+      booking.name = updateBookingDto.name;
+    }
+    if (updateBookingDto.phone !== undefined) {
+      booking.phone = updateBookingDto.phone;
+    }
+    if (updateBookingDto.date !== undefined) {
+      booking.date = new Date(updateBookingDto.date);
+    }
+    if (updateBookingDto.time !== undefined) {
+      booking.time = updateBookingDto.time;
+    }
+    if (updateBookingDto.notes !== undefined) {
+      booking.notes = updateBookingDto.notes;
+    }
+    if (updateBookingDto.status !== undefined) {
+      booking.status = updateBookingDto.status;
+    }
+
+    // Update services if provided
+    if (updateBookingDto.services !== undefined) {
+      // Delete existing service items
+      await this.bookingServiceItemRepository.delete({ bookingId: id });
+
+      // Create new service items
+      const serviceItems = updateBookingDto.services.map(service =>
+        this.bookingServiceItemRepository.create({
+          bookingId: id,
+          serviceId: service.serviceId,
+          serviceName: service.serviceName,
+        }),
+      );
+
+      // Save new service items
+      await this.bookingServiceItemRepository.save(serviceItems);
+    }
+
+    // Save booking
+    await this.bookingRepository.save(booking);
+
+    // Reload booking with services
+    return await this.bookingRepository.findOne({
+      where: { id },
+      relations: ['services'],
+    });
   }
 }
 

@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Param,
+  Patch,
   Post,
   Query,
 } from '@nestjs/common';
@@ -14,7 +15,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { BookingService } from '../services/booking.service';
-import { CreateBookingDto, GetBookingsQueryDto } from '../../application/dto/booking.dto';
+import { CreateBookingDto, GetBookingsQueryDto, UpdateBookingStatusDto, UpdateBookingDto } from '../../application/dto/booking.dto';
 import { BookingEntity } from '../../infrastructure/database/entities/booking.entity';
 
 @ApiTags('Bookings')
@@ -243,6 +244,167 @@ export class BookingController {
       success: true,
       data: booking,
       message: 'Booking retrieved successfully',
+    };
+  }
+
+  @Patch(':id/status')
+  @ApiOperation({
+    summary: 'Update booking status',
+    description: 'Updates the status of a booking. Valid statuses: pending, confirmed, completed, cancelled',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'Booking ID (UUID)',
+    type: String,
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Booking status updated successfully',
+    schema: {
+      example: {
+        success: true,
+        data: {
+          id: '123e4567-e89b-12d3-a456-426614174000',
+          name: 'Ahmed Ali',
+          phone: '+966501234567',
+          date: '2024-12-25',
+          time: '14:30',
+          status: 'confirmed',
+          notes: null,
+          services: [
+            {
+              id: '123e4567-e89b-12d3-a456-426614174001',
+              serviceId: 'service-123',
+              serviceName: 'Classic Haircut',
+              bookingId: '123e4567-e89b-12d3-a456-426614174000',
+              createdAt: '2024-01-15T10:30:00.000Z',
+            },
+            {
+              id: '123e4567-e89b-12d3-a456-426614174002',
+              serviceId: 'service-456',
+              serviceName: 'Beard Trim',
+              bookingId: '123e4567-e89b-12d3-a456-426614174000',
+              createdAt: '2024-01-15T10:30:00.000Z',
+            },
+          ],
+          createdAt: '2024-01-15T10:30:00.000Z',
+          updatedAt: '2024-01-15T10:35:00.000Z',
+        },
+        message: 'Booking status updated successfully',
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request - Invalid status value',
+    schema: {
+      example: {
+        statusCode: 400,
+        message: ['Status must be one of: pending, confirmed, completed, cancelled'],
+        error: 'Bad Request',
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Booking not found',
+    schema: {
+      example: {
+        statusCode: 404,
+        message: 'Booking with ID 123e4567-e89b-12d3-a456-426614174000 not found',
+        error: 'Not Found',
+      },
+    },
+  })
+  async updateBookingStatus(
+    @Param('id') id: string,
+    @Body() updateStatusDto: UpdateBookingStatusDto,
+  ) {
+    const booking = await this.bookingService.updateBookingStatus(id, updateStatusDto);
+    return {
+      success: true,
+      data: booking,
+      message: 'Booking status updated successfully',
+    };
+  }
+
+  @Patch(':id')
+  @ApiOperation({
+    summary: 'Update booking details',
+    description: 'Updates booking information. All fields are optional - only provided fields will be updated. If services are provided, existing services will be replaced.',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'Booking ID (UUID)',
+    type: String,
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Booking updated successfully',
+    schema: {
+      example: {
+        success: true,
+        data: {
+          id: '123e4567-e89b-12d3-a456-426614174000',
+          name: 'Ahmed Ali',
+          phone: '+966501234567',
+          date: '2024-12-26',
+          time: '15:00',
+          status: 'confirmed',
+          notes: 'Updated notes',
+          services: [
+            {
+              id: '123e4567-e89b-12d3-a456-426614174003',
+              serviceId: 'service-789',
+              serviceName: 'Hair Wash',
+              bookingId: '123e4567-e89b-12d3-a456-426614174000',
+              createdAt: '2024-01-15T10:40:00.000Z',
+            },
+          ],
+          createdAt: '2024-01-15T10:30:00.000Z',
+          updatedAt: '2024-01-15T10:40:00.000Z',
+        },
+        message: 'Booking updated successfully',
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request - Validation failed',
+    schema: {
+      example: {
+        statusCode: 400,
+        message: [
+          'phone must be a valid phone number',
+          'date must be a valid date string',
+          'Status must be one of: pending, confirmed, completed, cancelled',
+        ],
+        error: 'Bad Request',
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Booking not found',
+    schema: {
+      example: {
+        statusCode: 404,
+        message: 'Booking with ID 123e4567-e89b-12d3-a456-426614174000 not found',
+        error: 'Not Found',
+      },
+    },
+  })
+  async updateBooking(
+    @Param('id') id: string,
+    @Body() updateBookingDto: UpdateBookingDto,
+  ) {
+    const booking = await this.bookingService.updateBooking(id, updateBookingDto);
+    return {
+      success: true,
+      data: booking,
+      message: 'Booking updated successfully',
     };
   }
 }
