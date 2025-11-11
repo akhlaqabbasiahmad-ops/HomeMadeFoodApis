@@ -5,6 +5,8 @@ import { DataSource, DataSourceOptions } from 'typeorm';
 
 // Entity imports
 import { AddressEntity } from './entities/address.entity';
+import { BookingEntity } from './entities/booking.entity';
+import { BookingServiceItemEntity } from './entities/booking-service-item.entity';
 import { Category } from './entities/category.entity';
 import { FoodItemEntity } from './entities/food-item.entity';
 import { OrderItem } from './entities/order-item.entity';
@@ -20,7 +22,7 @@ export const databaseConfig: DataSourceOptions = {
   username: process.env.DATABASE_USERNAME || 'postgres',
   password: process.env.DATABASE_PASSWORD || '',
   database: process.env.DATABASE_NAME || 'homemadefood_db',
-  entities: [UserEntity, AddressEntity, RestaurantEntity, FoodItemEntity, Category, Order, OrderItem],
+  entities: [UserEntity, AddressEntity, RestaurantEntity, FoodItemEntity, Category, Order, OrderItem, BookingEntity, BookingServiceItemEntity],
   migrations: [path.join(__dirname, 'migrations/*.ts')],
   synchronize: process.env.DATABASE_SYNCHRONIZE === 'true',
   logging: process.env.DATABASE_LOGGING === 'true',
@@ -36,7 +38,7 @@ export const typeOrmConfig = (configService: ConfigService): TypeOrmModuleOption
     username: configService.get('DATABASE_USERNAME', 'postgres'),
     password: configService.get('DATABASE_PASSWORD'),
     database: configService.get('DATABASE_NAME', 'homemadefood_db'),
-    entities: [UserEntity, AddressEntity, RestaurantEntity, FoodItemEntity, Category, Order, OrderItem],
+    entities: [UserEntity, AddressEntity, RestaurantEntity, FoodItemEntity, Category, Order, OrderItem, BookingEntity, BookingServiceItemEntity],
     synchronize: configService.get('DATABASE_SYNCHRONIZE') === 'true',
     migrations: [path.join(__dirname, 'migrations/*.js')],
     migrationsRun: false,
